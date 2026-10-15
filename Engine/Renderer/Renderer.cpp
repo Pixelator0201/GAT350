@@ -2,6 +2,9 @@
 #include "Renderer.h"
 #include "Model.h"
 #include "Texture.h"
+#include "Pipeline.h"
+#include "VertexBuffer.h"
+#include "IndexBuffer.h"
 
 #include "Math/Transform.h"
 #include "Math/MathUtils.h"
@@ -30,17 +33,19 @@ namespace nu
             return false;
         }
 
-        m_renderer = SDL_CreateRenderer(m_window, NULL);
-        if (m_renderer == nullptr) 
+        SDL_GPUShaderFormat formats = SDL_GPU_SHADERFORMAT_SPIRV | SDL_GPU_SHADERFORMAT_DXIL;
+        m_gpuDevice = SDL_CreateGPUDevice(formats, true, NULL);
+        if (!m_gpuDevice)
         {
-            std::cerr << "SDL_CreateRenderer Error: " << SDL_GetError() << std::endl;
+            std::cerr << "Failed to create GPU Device: " << SDL_GetError() << std::endl;
             SDL_DestroyWindow(m_window);
             SDL_Quit();
             return false;
         }
 
-        SDL_SetDefaultTextureScaleMode(m_renderer, SDL_SCALEMODE_PIXELART);
-        SDL_SetRenderVSync(m_renderer, 1);
+        SDL_ClaimWindowForGPUDevice(m_gpuDevice, m_window);
+
+        std::cout << "GPU Device: " << SDL_GetGPUDeviceDriver(m_gpuDevice) << std::endl;
 
         return true;
     }
@@ -71,6 +76,50 @@ namespace nu
     void Renderer::Present() const
     {
         SDL_RenderPresent(m_renderer);
+    }
+
+    bool Renderer::BeginFrame()
+    {
+        m_commandBuffer = SDL_AcquireGPUCommandBuffer(m_gpuDevice);
+        if (!m_commandBuffer)
+        {
+            std::cerr << "Could not acquire command buffer: " << SDL_GetError() << std::endl;
+            return false;
+        }
+
+
+        SDL_GPUTexture* swapchainTexture = nullptr;
+        if (!SDL_WaitAndAcquireGPUSwapchainTexture(m_commandBuffer, m_window, &swapchainTexture, nullptr, nullptr))
+        {
+            std::cerr << "Could not acquire swapchain texture: " << SDL_GetError() << std::endl;
+            return false;
+        }
+
+        if (swapchainTexture != nullptr)
+        {
+            // configure the color target attachments (This handles clearing the screen)
+            SDL_GPUColorTargetInfo color_target_info{};
+            color_target_info.texture = swapchainTexture;
+            color_target_info.clear_color = SDL_FColor{ 1.0f, 0.0f, 0.0f, 1.0f };
+            color_target_info.load_op = SDL_GPU_LOADOP_CLEAR;
+            color_target_info.store_op = SDL_GPU_STOREOP_STORE;
+
+            m_renderPass = SDL_BeginGPURenderPass(m_commandBuffer, &color_target_info, 1, nullptr);
+            SDL_EndGPURenderPass(m_renderPass);
+        }
+
+        return true;
+    }
+
+    bool Renderer::EndFrame() 
+    {
+        if (!SDL_SubmitGPUCommandBuffer(m_commandBuffer))
+        {
+            std::cerr << "Could not submit command buffer: " << SDL_GetError() << std::endl;
+            return false;
+        }
+
+        return true;
     }
 
     void Renderer::DrawPoint(float x, float y) const
@@ -160,5 +209,90 @@ namespace nu
 
         // https://wiki.libsdl.org/SDL3/SDL_RenderTexture
         SDL_RenderTextureRotated(m_renderer, texture.m_texture, &sourceRect, &destRect, angle, NULL, (flipH) ? SDL_FLIP_HORIZONTAL : SDL_FLIP_NONE);
+    }
+
+    void Renderer::SetPipeline(const Pipeline& pipeline)
+    {
+        // bind the pipeline to the current render pass with SDL_BindGPUGraphicsPipeline(renderPass, gpuPipeline)
+        // the pipeline sets the shaders and render settings used by the draw calls that follow
+        // use pipeline.GetGPUPipeline() to get the sdl pipeline
+        SDL_BindGPUGraphicsPipeline(m_renderPass, pipeline.m_gpuPipeline);
+    }
+
+    void Renderer::SetVertexBuffer(const VertexBuffer& vertexBuffer)
+    {
+        // describe which buffer to bind and where to start reading from
+        SDL_GPUBufferBinding binding{
+            .buffer = vertexBuffer.m_gpuBuffer, // todo: the vertex buffer's gpu buffer
+            .offset = 0   // start reading at the beginning of the buffer
+        };
+
+        // bind the vertex buffer to the current render pass with SDL_BindGPUVertexBuffers()
+        // the draw calls that follow read their vertices from this buffer
+        // parameters:
+        //   render pass   - the current render pass (m_renderPass)
+        //   first slot    - 0, matches the buffer slot set in Pipeline::AddVertexBuffer()
+        //   bindings      - pointer to the binding above
+        //   binding count - 1, we are binding one buffer
+        SDL_BindGPUVertexBuffers(
+            m_renderPass,
+            0,
+            &binding,
+            1
+        );
+    }
+    void Renderer::SetIndexBuffer(const IndexBuffer& indexBuffer)
+    {
+        // describe which buffer to bind and where to start reading from
+        SDL_GPUBufferBinding binding{
+            .buffer = indexBuffer.m_gpuBuffer, // todo: the vertex buffer's gpu buffer
+            .offset = 0   // start reading at the beginning of the buffer
+        };
+
+        // bind the vertex buffer to the current render pass with SDL_BindGPUVertexBuffers()
+        // the draw calls that follow read their vertices from this buffer
+        // parameters:
+        //   render pass   - the current render pass (m_renderPass)
+        //   bindings      - pointer to the binding above
+        //   element size - 16-bit or 32-bit
+        SDL_BindGPUIndexBuffer(
+            m_renderPass,
+            &binding,
+            SDL_GPU_INDEXELEMENTSIZE_32BIT
+        );
+    }
+
+    void Renderer::Draw(uint32_t vertexCount)
+    {
+        // draw using the currently bound pipeline and vertex buffer with SDL_DrawGPUPrimitives()
+        // parameters:
+        //   render pass    - the current render pass (m_renderPass)
+        //   vertex count   - the number of vertices to draw (vertexCount)
+        //   instance count - 1, draw one copy (more than 1 is used for instancing)
+        //   first vertex   - 0, start at the first vertex in the buffer
+        //   first instance - 0, start at the first instance
+        SDL_DrawGPUPrimitives(m_renderPass, vertexCount, 1, 0, 0);
+    }
+
+    void Renderer::DrawIndex(const IndexBuffer& indexBuffer)
+    {
+        SDL_DrawGPUIndexedPrimitives(
+            m_renderPass,
+            indexBuffer.GetIndexCount(),
+            1,
+            0,
+            0,
+            0
+        );
+    }
+
+    void Renderer::SetVertexUniform(uint32_t slot, const void* data, uint32_t size)
+    {
+        SDL_PushGPUVertexUniformData(m_commandBuffer, slot, data, size);
+    }
+
+    void Renderer::SetFragmentUniform(uint32_t slot, const void* data, uint32_t size)
+    {
+        SDL_PushGPUFragmentUniformData(m_commandBuffer, slot, data, size);
     }
 }
