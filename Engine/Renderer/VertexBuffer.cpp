@@ -9,15 +9,17 @@ namespace nu
 		// if both the gpu buffer and the gpu device are valid (not null),
 		// release the buffer with SDL_ReleaseGPUBuffer(device, buffer)
 		if (m_gpuBuffer && m_gpuDevice)
+		{
 			SDL_ReleaseGPUBuffer(m_gpuDevice, m_gpuBuffer);
+		}
 	}
 
-	bool VertexBuffer::Create(uint32_t vertexCount, uint32_t vertexSize, const uint8_t* data, const class Renderer& renderer)
+	bool VertexBuffer::Create(uint32_t vertexCount, uint32_t vertexSize, const uint8_t* data, SDL_GPUDevice* gpuDevice)
 	{
 		// store the vertex count in m_vertexCount (needed later when drawing)
 		// store the gpu device in m_gpuDevice so the destructor can release the buffer later
 		m_vertexCount = vertexCount;
-		m_gpuDevice = renderer.m_gpuDevice;
+		m_gpuDevice = gpuDevice;
 
 		// calculate the total size in bytes of all the vertices (number of vertices * size of one vertex)
 		uint32_t verticesSize = vertexCount * vertexSize;
@@ -72,7 +74,7 @@ namespace nu
 			std::cerr << "Could not map transfer buffer: " << SDL_GetError() << std::endl;
 
 			SDL_ReleaseGPUTransferBuffer(m_gpuDevice, transferBuffer);
-			SDL_ReleaseGPUBuffer(m_gpuDevice, m_gpuBuffer);
+			SDL_ReleaseGPUBuffer(gpuDevice, m_gpuBuffer);
 			m_gpuBuffer = nullptr;
 
 			return false;
@@ -95,7 +97,7 @@ namespace nu
 			std::cerr << "Could not acquire GPU command buffer: " << SDL_GetError() << std::endl;
 
 			SDL_ReleaseGPUTransferBuffer(m_gpuDevice, transferBuffer);
-			SDL_ReleaseGPUBuffer(m_gpuDevice, m_gpuBuffer);
+			SDL_ReleaseGPUBuffer(gpuDevice, m_gpuBuffer);
 			m_gpuBuffer = nullptr;
 
 			return false;
@@ -129,8 +131,8 @@ namespace nu
 		{
 			std::cerr << "Could not submit GPU command buffer: " << SDL_GetError() << std::endl;
 
-			SDL_ReleaseGPUTransferBuffer(m_gpuDevice, transferBuffer);
-			SDL_ReleaseGPUBuffer(m_gpuDevice, m_gpuBuffer);
+			SDL_ReleaseGPUTransferBuffer(gpuDevice, transferBuffer);
+			SDL_ReleaseGPUBuffer(gpuDevice, m_gpuBuffer);
 			m_gpuBuffer = nullptr;
 
 			return false;

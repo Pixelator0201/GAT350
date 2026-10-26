@@ -105,7 +105,6 @@ namespace nu
             color_target_info.store_op = SDL_GPU_STOREOP_STORE;
 
             m_renderPass = SDL_BeginGPURenderPass(m_commandBuffer, &color_target_info, 1, nullptr);
-            SDL_EndGPURenderPass(m_renderPass);
         }
 
         return true;
@@ -113,6 +112,12 @@ namespace nu
 
     bool Renderer::EndFrame() 
     {
+        if (m_renderPass)
+        {
+            SDL_EndGPURenderPass(m_renderPass);
+            m_renderPass = nullptr;
+        }
+
         if (!SDL_SubmitGPUCommandBuffer(m_commandBuffer))
         {
             std::cerr << "Could not submit command buffer: " << SDL_GetError() << std::endl;
@@ -240,6 +245,7 @@ namespace nu
             &binding,
             1
         );
+
     }
     void Renderer::SetIndexBuffer(const IndexBuffer& indexBuffer)
     {

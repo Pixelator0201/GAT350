@@ -9,7 +9,9 @@ namespace nu
 		// if both the gpu device and the gpu pipeline are valid (not null),
 		// release the pipeline with SDL_ReleaseGPUGraphicsPipeline(device, pipeline)
 		if (m_gpuPipeline && m_gpuDevice)
+		{
 			SDL_ReleaseGPUGraphicsPipeline(m_gpuDevice, m_gpuPipeline);
+		}
 	}
 
 	bool Pipeline::Create(const Shader& vertexShader, const Shader& fragmentShader, SDL_GPUDevice* gpuDevice, SDL_Window* window)
@@ -54,7 +56,7 @@ namespace nu
 			// the render targets this pipeline draws into, uses the color target array from above
 			.target_info = SDL_GPUGraphicsPipelineTargetInfo{
 				.color_target_descriptions = colorTargetDescriptions.data(), // todo: pointer to colorTargetDescriptions
-				.num_color_targets = (uint32_t)colorTargetDescriptions.size() // todo: number of color targets
+				.num_color_targets = colorTargetDescriptions.size() // todo: number of color targets
 			}
 		};
 
@@ -65,6 +67,7 @@ namespace nu
 		if (m_gpuPipeline == nullptr)
 		{
 			std::cerr << "Couldn't create graphics pipeline: " << SDL_GetError() << std::endl;
+			SDL_ReleaseGPUGraphicsPipeline(gpuDevice, m_gpuPipeline);
 			return false;
 		}
 

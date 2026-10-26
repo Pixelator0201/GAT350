@@ -1,18 +1,16 @@
-
 struct Input
 {
-	float4 color : TEXCOORD0;
 };
 
 struct Output
 {
-	float4 color : SV_Target0;
+	float4 Color : SV_Target0;
 };
 
 Output main(Input input)
 {
 	Output output;
-	output.color = input.color;
+	output.Color = float4(0.0f, 0.5f, 0.5f, 1.0f);
 
 	return output;
 }

@@ -26,19 +26,19 @@ namespace nu
 
 struct Vertex
 {
-    //float x, y, z;
-    Vector3 position;
-    Color4 color;
+    float x, y, z;
+    //Vector3 position;
+    //Color4 color;
 };
 
 std::vector<Vertex> vertices =
 {
-    //Vertex{ -1.0f, -1.0f, 0.0f}, // Bottom-Left
-    Vertex{ Vector3{-1.0f, -1.0f, 0.0f}, Color4{1, 0, 0, 1}}, // Bottom-Left
-    Vertex{ Vector3{1.0f, -1.0f, 0.0f}, Color4{1, 1, 0, 1}}, // Bottom-Right
-    Vertex{ Vector3{0.0f, 1.0f, 0.0f}, Color4{1, 0, 1, 1}}, // Top-Middle
-    //Vertex{  1.0f, -1.0f, 0.0f}, // Bottom-Right
-    //Vertex{  0.0f,  1.0f, 0.0f}, // Top-Middle
+    Vertex{ -0.67f, -1.0f, 0.0f}, // Bottom-Left
+    //Vertex{ Vector3{-1.0f, -1.0f, 0.0f}, Color4{1, 0, 0, 1}}, // Bottom-Left
+    //Vertex{ Vector3{1.0f, -1.0f, 0.0f}, Color4{1, 1, 0, 1}}, // Bottom-Right
+    //Vertex{ Vector3{0.0f, 1.0f, 0.0f}, Color4{1, 0, 1, 1}}, // Top-Middle
+    Vertex{  1.0f, -0.67f, 0.0f}, // Bottom-Right
+    Vertex{  0.0f,  0.75f, 0.0f}, // Top-Middle
 };
 
 std::vector<uint32_t> indices = { 0, 1, 2, 2, 3, 0 };
@@ -60,11 +60,11 @@ int main()
     auto vb = std::make_shared<VertexBuffer>();
     vb->Create<Vertex>(vertices, Engine::Instance().GetRenderer().GetGPUDevice());
 
-    auto ib = std::make_shared<IndexBuffer>();
-    ib->Create(indices, Engine::Instance().GetRenderer());
+    //auto ib = std::make_shared<IndexBuffer>();
+    //ib->Create(indices, Engine::Instance().GetRenderer());
 
-    auto vshader = Resources().Get<nu::Shader>("shaders/position.vert", Engine::Instance().GetRenderer(), 1);
-    auto fshader = Resources().Get<nu::Shader>("shaders/color.frag", Engine::Instance().GetRenderer(), 1);
+    auto vshader = Resources().Get<nu::Shader>("shaders/position.vert", Engine::Instance().GetRenderer());
+    auto fshader = Resources().Get<nu::Shader>("shaders/color.frag", Engine::Instance().GetRenderer());
 
     auto pipeline = std::make_shared<Pipeline>();
     pipeline->AddVertexBuffer(sizeof(Vertex));
@@ -72,12 +72,12 @@ int main()
     pipeline->AddVertexAttribute(
         0,
         SDL_GPU_VERTEXELEMENTFORMAT_FLOAT3,
-        offsetof(Vertex, position));
+        offsetof(Vertex, x));
     //Color
-    pipeline->AddVertexAttribute(
-        0,
-        SDL_GPU_VERTEXELEMENTFORMAT_FLOAT4,
-        offsetof(Vertex, color));
+    //pipeline->AddVertexAttribute(
+    //    0,
+    //    SDL_GPU_VERTEXELEMENTFORMAT_FLOAT4,
+    //    offsetof(Vertex, color));
 
     pipeline->Create(*vshader.get(), *fshader.get(),
         Engine::Instance().GetRenderer().GetGPUDevice(),
@@ -139,11 +139,11 @@ int main()
 
         Engine::Instance().GetRenderer().SetPipeline(*pipeline);
         Engine::Instance().GetRenderer().SetVertexBuffer(*vb);
-        Engine::Instance().GetRenderer().SetIndexBuffer(*ib);
-        Engine::Instance().GetRenderer().SetVertexUniform(0, &uniform, sizeof(uniform));
-        Engine::Instance().GetRenderer().SetFragmentUniform(0, &color, sizeof(color));
-        //Engine::Instance().GetRenderer().Draw(vb->GetVertexCount());
-        Engine::Instance().GetRenderer().DrawIndex(*ib);
+        //Engine::Instance().GetRenderer().SetIndexBuffer(*ib);
+        //Engine::Instance().GetRenderer().SetVertexUniform(0, &uniform, sizeof(uniform));
+        //Engine::Instance().GetRenderer().SetFragmentUniform(0, &color, sizeof(color));
+        Engine::Instance().GetRenderer().Draw(vb->GetVertexCount());
+        //Engine::Instance().GetRenderer().DrawIndex(*ib);
 
         Engine::Instance().GetRenderer().EndFrame();
     }
